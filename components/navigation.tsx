@@ -2,155 +2,120 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useAuth } from "./auth-provider"
+import { useRouter, usePathname } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Home, Package, Wine, History, LogOut, User, Menu } from "lucide-react"
+import { toast } from "sonner"
+import { useAuth } from "./auth-provider"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Home, Package, Wine, History, Menu, LogOut, User, Settings } from "lucide-react"
-
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Estoque", href: "/estoque", icon: Package },
-  { name: "Degustação", href: "/degustacao", icon: Wine },
-  { name: "Histórico", href: "/historico", icon: History },
-]
 
 export function Navigation() {
+  const { user } = useAuth()
+  const router = useRouter()
   const pathname = usePathname()
-  const { user, signOut } = useAuth()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
 
-  const handleSignOut = async () => {
+  const handleLogout = async () => {
     try {
-      await signOut()
+      await supabase.auth.signOut()
+      router.push("/login")
+      toast.success("Logout realizado com sucesso!")
     } catch (error) {
-      console.error("Erro ao fazer logout:", error)
+      toast.error("Erro ao fazer logout")
     }
   }
 
+  const navItems = [
+    { href: "/", label: "Dashboard", icon: Home },
+    { href: "/estoque", label: "Estoque", icon: Package },
+    { href: "/degustacao", label: "Degustação", icon: Wine },
+    { href: "/historico", label: "Histórico", icon: History },
+  ]
+
+  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
+    <>
+      {navItems.map((item) => {
+        const Icon = item.icon
+        const isActive = pathname === item.href
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={() => mobile && setIsOpen(false)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        )
+      })}
+    </>
+  )
+
+  if (!user) return null
+
   return (
-    <nav className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="text-2xl font-bold text-amber-600">
-                Charutos Main
-              </Link>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              {navigation.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                      pathname === item.href
-                        ? "border-amber-500 text-gray-900"
-                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 mr-2" />
-                    {item.name}
-                  </Link>
-                )
-              })}
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2">
+              <Wine className="h-6 w-6" />
+              <span className="font-bold text-lg">Charutos Manager</span>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-1">
+              <NavLinks />
             </div>
           </div>
 
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
+          <div className="flex items-center gap-4">
+            {/* Mobile Navigation */}
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64">
+                <div className="flex flex-col gap-4 mt-8">
+                  <NavLinks mobile />
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.user_metadata?.avatar_url || "/placeholder.svg"} alt={user?.email} />
-                    <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback>{user.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.user_metadata?.name || "Usuário"}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                <DropdownMenuItem className="flex flex-col items-start">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="font-medium">Perfil</span>
                   </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Perfil</span>
+                  <span className="text-xs text-muted-foreground">{user.email}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configurações</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-
-          <div className="sm:hidden flex items-center">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <div className="flex flex-col space-y-4 mt-4">
-                  <div className="flex items-center space-x-2 pb-4 border-b">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.user_metadata?.avatar_url || "/placeholder.svg"} alt={user?.email} />
-                      <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{user?.user_metadata?.name || "Usuário"}</p>
-                      <p className="text-xs text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </div>
-
-                  {navigation.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium ${
-                          pathname === item.href
-                            ? "bg-amber-100 text-amber-900"
-                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span>{item.name}</span>
-                      </Link>
-                    )
-                  })}
-
-                  <div className="pt-4 border-t">
-                    <Button variant="ghost" onClick={handleSignOut} className="w-full justify-start">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sair
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
           </div>
         </div>
       </div>

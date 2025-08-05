@@ -33,31 +33,12 @@ export interface TastingSession {
   date: string
   duration: number
   rating: number
-  notes: string
+  notes?: string
   flavors: string[]
   burn_quality: number
   draw_quality: number
   ash_quality: number
   user_id: string
-  created_at: string
-  updated_at: string
-}
-
-// Tipos para categorias
-export interface Category {
-  id: number
-  name: string
-  description: string
-  active: boolean
-  created_at: string
-}
-
-// Tipos para autenticação
-export interface UserProfile {
-  id: string
-  email: string
-  name: string
-  avatar_url?: string
   created_at: string
   updated_at: string
 }
