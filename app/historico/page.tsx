@@ -1,360 +1,285 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Clock, Star, Flame, Search, Eye } from "lucide-react"
+import { Star, Search, Clock, Wine } from "lucide-react"
+import { ProtectedRoute } from "@/components/protected-route"
 
-interface HistoricoItem {
+interface TastingHistory {
   id: string
-  nome: string
-  marca: string
-  paisOrigem: string
-  avaliacao: number
-  duracaoFumo: number
-  dataFim: string
-  sabores: string[]
-  observacoes: string
-  comprariaNovamente: string
-  corte?: string
-  momento?: string
-  fluxo?: string
-  fotoAnilha?: string
+  cigarId: string
+  cigarName: string
+  cigarBrand: string
+  date: string
+  duration: number
+  rating: number
+  flavors: string[]
+  notes: string
+  environment: string
+  pairing?: string
 }
 
 export default function HistoricoPage() {
-  const [historico, setHistorico] = useState<HistoricoItem[]>([])
-  const [filtroTexto, setFiltroTexto] = useState("")
-  const [filtroAvaliacao, setFiltroAvaliacao] = useState("todas")
-  const [selectedCharuto, setSelectedCharuto] = useState<HistoricoItem | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [tastingHistory, setTastingHistory] = useState<TastingHistory[]>([])
+  const [filteredHistory, setFilteredHistory] = useState<TastingHistory[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterRating, setFilterRating] = useState("all")
+  const [sortBy, setSortBy] = useState("date")
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem("charutos-historico")
-    if (savedHistory) {
-      setHistorico(JSON.parse(savedHistory))
+    const storedHistory = localStorage.getItem("tastingHistory")
+    if (storedHistory) {
+      const parsedHistory = JSON.parse(storedHistory)
+      setTastingHistory(parsedHistory)
+      setFilteredHistory(parsedHistory)
     }
   }, [])
 
-  const historicoFiltrado = historico.filter((item) => {
-    const matchTexto =
-      item.nome.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-      item.marca.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-      item.paisOrigem.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-      item.observacoes.toLowerCase().includes(filtroTexto.toLowerCase())
+  useEffect(() => {
+    let filtered = [...tastingHistory]
 
-    const matchAvaliacao =
-      filtroAvaliacao === "todas" ||
-      (filtroAvaliacao === "9-10" && item.avaliacao >= 9) ||
-      (filtroAvaliacao === "7-8" && item.avaliacao >= 7 && item.avaliacao < 9) ||
-      (filtroAvaliacao === "5-6" && item.avaliacao >= 5 && item.avaliacao < 7) ||
-      (filtroAvaliacao === "3-4" && item.avaliacao >= 3 && item.avaliacao < 5) ||
-      (filtroAvaliacao === "1-2" && item.avaliacao >= 1 && item.avaliacao < 3)
+    // Filtro de busca
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (tasting) =>
+          tasting.cigarName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          tasting.cigarBrand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          tasting.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          tasting.flavors.some((flavor) => flavor.toLowerCase().includes(searchTerm.toLowerCase())),
+      )
+    }
 
-    return matchTexto && matchAvaliacao
-  })
+    // Filtro de avaliação
+    if (filterRating !== "all") {
+      const rating = Number.parseInt(filterRating)
+      filtered = filtered.filter((tasting) => tasting.rating === rating)
+    }
 
-  const totalDegustacoes = historico.length
-  const tempoMedio =
-    historico.length > 0 ? Math.round(historico.reduce((acc, h) => acc + h.duracaoFumo, 0) / historico.length) : 0
-  const avaliacaoMedia =
-    historico.length > 0 ? (historico.reduce((acc, h) => acc + h.avaliacao, 0) / historico.length).toFixed(1) : "0.0"
-  const melhorAvaliacao = historico.length > 0 ? Math.max(...historico.map((h) => h.avaliacao)) : 0
+    // Ordenação
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date":
+          return new Date(b.date).getTime() - new Date(a.date).getTime()
+        case "rating":
+          return b.rating - a.rating
+        case "duration":
+          return b.duration - a.duration
+        case "name":
+          return a.cigarName.localeCompare(b.cigarName)
+        default:
+          return 0
+      }
+    })
 
-  const openModal = (charuto: HistoricoItem) => {
-    setSelectedCharuto(charuto)
-    setIsModalOpen(true)
+    setFilteredHistory(filtered)
+  }, [tastingHistory, searchTerm, filterRating, sortBy])
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} min`
+    } else {
+      const hours = Math.floor(minutes / 60)
+      const remainingMinutes = minutes % 60
+      return `${hours}h ${remainingMinutes}min`
+    }
+  }
+
+  const getRatingColor = (rating: number) => {
+    if (rating >= 4) return "text-green-600"
+    if (rating >= 3) return "text-yellow-600"
+    return "text-red-600"
+  }
+
+  const getAverageRating = () => {
+    if (tastingHistory.length === 0) return 0
+    const sum = tastingHistory.reduce((acc, tasting) => acc + tasting.rating, 0)
+    return (sum / tastingHistory.length).toFixed(1)
+  }
+
+  const getTotalTastings = () => tastingHistory.length
+
+  const getTotalDuration = () => {
+    const total = tastingHistory.reduce((acc, tasting) => acc + tasting.duration, 0)
+    return formatDuration(total)
   }
 
   return (
-    <div className="min-h-screen bg-orange-50">
-      <Navigation />
-
+    <ProtectedRoute>
       <div className="container mx-auto px-6 py-8">
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Histórico</h1>
-          <p className="text-gray-600">Revise suas avaliações anteriores</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Histórico de Degustações</h1>
+          <p className="text-gray-600">Revise suas experiências passadas</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total de Degustações</p>
-                  <p className="text-3xl font-bold text-gray-900">{totalDegustacoes}</p>
-                  <p className="text-xs text-gray-500">Registradas</p>
-                </div>
-                <Clock className="h-8 w-8 text-orange-500" />
-              </div>
+        {/* Estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Degustações</CardTitle>
+              <Wine className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{getTotalTastings()}</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Tempo Médio</p>
-                  <p className="text-3xl font-bold text-gray-900">{tempoMedio}</p>
-                  <p className="text-xs text-gray-500">Minutos</p>
-                </div>
-                <Clock className="h-8 w-8 text-orange-500" />
-              </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
+              <Star className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{getAverageRating()}/5</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avaliação Média</p>
-                  <p className="text-3xl font-bold text-gray-900">{avaliacaoMedia}</p>
-                  <p className="text-xs text-gray-500">De 10</p>
-                </div>
-                <Star className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Melhor Avaliação</p>
-                  <p className="text-3xl font-bold text-gray-900">{melhorAvaliacao}</p>
-                  <p className="text-xs text-gray-500">Pontos</p>
-                </div>
-                <Flame className="h-8 w-8 text-orange-500" />
-              </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tempo Total</CardTitle>
+              <Clock className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{getTotalDuration()}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card className="bg-white border-0 shadow-sm mb-8">
+        {/* Filtros */}
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">Filtros</CardTitle>
-            <CardDescription className="text-gray-600">Encontre degustações específicas</CardDescription>
+            <CardTitle className="text-lg">Filtros e Ordenação</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    placeholder="Buscar por nome, marca, origem ou notas..."
-                    value={filtroTexto}
-                    onChange={(e) => setFiltroTexto(e.target.value)}
-                    className="pl-10"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar degustações..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Avaliação</label>
-                <Select value={filtroAvaliacao} onValueChange={setFiltroAvaliacao}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    <SelectItem value="9-10">9-10 (Excelente)</SelectItem>
-                    <SelectItem value="7-8">7-8 (Muito Bom)</SelectItem>
-                    <SelectItem value="5-6">5-6 (Bom)</SelectItem>
-                    <SelectItem value="3-4">3-4 (Regular)</SelectItem>
-                    <SelectItem value="1-2">1-2 (Ruim)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={filterRating} onValueChange={setFilterRating}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por avaliação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as avaliações</SelectItem>
+                  <SelectItem value="5">5 estrelas</SelectItem>
+                  <SelectItem value="4">4 estrelas</SelectItem>
+                  <SelectItem value="3">3 estrelas</SelectItem>
+                  <SelectItem value="2">2 estrelas</SelectItem>
+                  <SelectItem value="1">1 estrela</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Data (mais recente)</SelectItem>
+                  <SelectItem value="rating">Avaliação (maior)</SelectItem>
+                  <SelectItem value="duration">Duração (maior)</SelectItem>
+                  <SelectItem value="name">Nome do charuto</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
 
-        {/* History List */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-gray-900">
-              Suas Degustações ({historicoFiltrado.length})
-            </CardTitle>
-            <CardDescription className="text-gray-600">Histórico completo de experiências</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {historicoFiltrado.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Clock className="w-12 h-12 text-gray-400" />
-                </div>
-                <h4 className="text-lg font-medium text-gray-900 mb-2">
-                  {historico.length === 0 ? "Nenhuma degustação no histórico ainda" : "Nenhuma degustação encontrada"}
-                </h4>
-                <p className="text-gray-500">
-                  {historico.length === 0
-                    ? "Suas degustações finalizadas aparecerão aqui"
-                    : "Tente ajustar os filtros de busca"}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {historicoFiltrado.map((item) => (
-                  <Card key={item.id} className="border-2 border-gray-200 hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg font-semibold text-gray-900">{item.nome}</CardTitle>
-                          <CardDescription className="text-gray-600">{item.marca}</CardDescription>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800 border-green-200">⭐ {item.avaliacao}/10</Badge>
+        {/* Lista de Degustações */}
+        {filteredHistory.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Wine className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {tastingHistory.length === 0 ? "Nenhuma degustação registrada" : "Nenhuma degustação encontrada"}
+              </h3>
+              <p className="text-gray-600 text-center">
+                {tastingHistory.length === 0
+                  ? "Comece sua primeira degustação para ver o histórico aqui."
+                  : "Tente ajustar os filtros para encontrar o que procura."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {filteredHistory.map((tasting) => (
+              <Card key={tasting.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{tasting.cigarName}</CardTitle>
+                      <CardDescription>{tasting.cigarBrand}</CardDescription>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center mb-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-4 w-4 ${
+                              i < tasting.rating ? "fill-orange-400 text-orange-400" : "text-gray-300"
+                            }`}
+                          />
+                        ))}
+                        <span className={`ml-2 font-medium ${getRatingColor(tasting.rating)}`}>{tasting.rating}/5</span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2 mb-4">
-                        <p className="text-sm text-gray-600">
-                          <strong>Data:</strong> {new Date(item.dataFim).toLocaleDateString("pt-BR")}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Tempo:</strong> {item.duracaoFumo} min
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Compraria novamente:</strong>{" "}
-                          {item.comprariaNovamente === "sim"
-                            ? "Sim"
-                            : item.comprariaNovamente === "nao"
-                              ? "Não"
-                              : "Depende"}
-                        </p>
+                      <p className="text-sm text-gray-500">{new Date(tasting.date).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="font-medium text-sm text-gray-700 mb-2">Detalhes da Degustação</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Duração:</span>
+                            <span className="text-sm font-medium">{formatDuration(tasting.duration)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Ambiente:</span>
+                            <span className="text-sm font-medium">{tasting.environment}</span>
+                          </div>
+                          {tasting.pairing && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Harmonização:</span>
+                              <span className="text-sm font-medium">{tasting.pairing}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Button variant="outline" className="w-full bg-transparent" onClick={() => openModal(item)}>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Ver Detalhes
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Modal de Detalhes */}
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold">{selectedCharuto?.nome}</DialogTitle>
-              <DialogDescription className="text-gray-600">
-                {selectedCharuto?.marca} - {selectedCharuto?.paisOrigem}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedCharuto && (
-              <div className="space-y-6">
-                {/* Informações Básicas */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Avaliação</p>
-                    <div className="flex items-center">
-                      <Badge className="bg-green-100 text-green-800 border-green-200">
-                        ⭐ {selectedCharuto.avaliacao}/10
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Duração</p>
-                    <p className="text-lg font-semibold">{selectedCharuto.duracaoFumo} minutos</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Data da Degustação</p>
-                    <p className="text-lg font-semibold">
-                      {new Date(selectedCharuto.dataFim).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Compraria Novamente</p>
-                    <p className="text-lg font-semibold">
-                      {selectedCharuto.comprariaNovamente === "sim"
-                        ? "Sim"
-                        : selectedCharuto.comprariaNovamente === "nao"
-                          ? "Não"
-                          : "Depende do Preço"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Detalhes da Degustação */}
-                {(selectedCharuto.corte || selectedCharuto.momento || selectedCharuto.fluxo) && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Detalhes da Degustação</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      {selectedCharuto.corte && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Tipo de Corte</p>
-                          <p className="text-base capitalize">{selectedCharuto.corte}</p>
+                      <div>
+                        <h4 className="font-medium text-sm text-gray-700 mb-2">Sabores Identificados</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {tasting.flavors.map((flavor, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {flavor}
+                            </Badge>
+                          ))}
                         </div>
-                      )}
-                      {selectedCharuto.momento && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Momento</p>
-                          <p className="text-base capitalize">{selectedCharuto.momento}</p>
-                        </div>
-                      )}
-                      {selectedCharuto.fluxo && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Fluxo</p>
-                          <p className="text-base capitalize">{selectedCharuto.fluxo}</p>
-                        </div>
-                      )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Notas da Degustação</h4>
+                      <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                        {tasting.notes || "Nenhuma nota adicional registrada."}
+                      </p>
                     </div>
                   </div>
-                )}
-
-                {/* Sabores */}
-                {selectedCharuto.sabores && selectedCharuto.sabores.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Sabores Identificados</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedCharuto.sabores.map((sabor, index) => (
-                        <Badge key={index} variant="secondary" className="text-sm">
-                          {sabor}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Observações */}
-                {selectedCharuto.observacoes && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Observações</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-gray-700">{selectedCharuto.observacoes}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Foto da Anilha */}
-                {selectedCharuto.fotoAnilha && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Foto da Anilha</h3>
-                    <img
-                      src={selectedCharuto.fotoAnilha || "/placeholder.svg"}
-                      alt="Anilha do charuto"
-                      className="max-w-full h-auto rounded-lg border"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

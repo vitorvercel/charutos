@@ -1,416 +1,272 @@
 "use client"
 
-import { DialogTrigger } from "@/components/ui/dialog"
-
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Navigation } from "@/components/navigation"
-import { Trash2, Edit, Plus, Package } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { TastingDialog } from "@/components/tasting-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, Edit, Trash2, Package } from "lucide-react"
+import { AddCigarModal } from "@/components/add-cigar-modal"
+import { ProtectedRoute } from "@/components/protected-route"
 
-interface Charuto {
+interface Cigar {
   id: string
-  nome: string
-  marca: string
-  paisOrigem: string
-  preco: number
-  quantidade: number
-  dataCompra: string
-  foto?: string
+  name: string
+  brand: string
+  origin: string
+  size: string
+  wrapper: string
+  strength: string
+  price: number
+  quantity: number
+  purchaseDate: string
+  notes?: string
 }
 
 export default function EstoquePage() {
-  const [charutos, setCharutos] = useState<Charuto[]>([])
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingCharuto, setEditingCharuto] = useState<Charuto | null>(null)
-  const [formData, setFormData] = useState<Partial<Charuto>>({
-    nome: "",
-    marca: "",
-    paisOrigem: "",
-    preco: 0,
-    quantidade: 1,
-    dataCompra: new Date().toISOString().split("T")[0],
-    foto: "",
-  })
-  const [selectedCharutoForTasting, setSelectedCharutoForTasting] = useState<Charuto | null>(null)
-  const [isTastingDialogOpen, setIsTastingDialogOpen] = useState(false)
+  const [cigars, setCigars] = useState<Cigar[]>([])
+  const [filteredCigars, setFilteredCigars] = useState<Cigar[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterBrand, setFilterBrand] = useState("all")
+  const [filterStrength, setFilterStrength] = useState("all")
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingCigar, setEditingCigar] = useState<Cigar | null>(null)
 
   useEffect(() => {
-    const savedCharutos = localStorage.getItem("charutos-estoque")
-    if (savedCharutos) {
-      setCharutos(JSON.parse(savedCharutos))
+    const storedCigars = localStorage.getItem("cigars")
+    if (storedCigars) {
+      const parsedCigars = JSON.parse(storedCigars)
+      setCigars(parsedCigars)
+      setFilteredCigars(parsedCigars)
     }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("charutos-estoque", JSON.stringify(charutos))
-  }, [charutos])
+    let filtered = cigars
 
-  const handleInputChange = (field: keyof Charuto, value: string | number) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.nome || !formData.marca) {
-      alert("Nome e marca são obrigatórios!")
-      return
-    }
-
-    if (editingCharuto) {
-      setCharutos((prev) =>
-        prev.map((charuto) => (charuto.id === editingCharuto.id ? ({ ...charuto, ...formData } as Charuto) : charuto)),
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (cigar) =>
+          cigar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          cigar.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          cigar.origin.toLowerCase().includes(searchTerm.toLowerCase()),
       )
-    } else {
-      const novoCharuto: Charuto = {
-        ...(formData as Charuto),
-        id: Date.now().toString(),
-      }
-      setCharutos((prev) => [...prev, novoCharuto])
     }
 
-    setFormData({
-      nome: "",
-      marca: "",
-      paisOrigem: "",
-      preco: 0,
-      quantidade: 1,
-      dataCompra: new Date().toISOString().split("T")[0],
-      foto: "",
-    })
-    setEditingCharuto(null)
-    setIsDialogOpen(false)
-  }
-
-  const handleEdit = (charuto: Charuto) => {
-    setEditingCharuto(charuto)
-    setFormData(charuto)
-    setIsDialogOpen(true)
-  }
-
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este charuto?")) {
-      setCharutos((prev) => prev.filter((charuto) => charuto.id !== id))
-    }
-  }
-
-  const moveToTasting = (charuto: Charuto) => {
-    if (charuto.quantidade <= 0) {
-      alert("Não há charutos disponíveis para degustação!")
-      return
+    if (filterBrand !== "all") {
+      filtered = filtered.filter((cigar) => cigar.brand === filterBrand)
     }
 
-    setSelectedCharutoForTasting(charuto)
-    setIsTastingDialogOpen(true)
-  }
+    if (filterStrength !== "all") {
+      filtered = filtered.filter((cigar) => cigar.strength === filterStrength)
+    }
 
-  const handleStartTasting = (tastingData: any) => {
-    if (!selectedCharutoForTasting) return
+    setFilteredCigars(filtered)
+  }, [cigars, searchTerm, filterBrand, filterStrength])
 
-    // Reduzir quantidade no estoque
-    setCharutos((prev) =>
-      prev.map((c) => (c.id === selectedCharutoForTasting.id ? { ...c, quantidade: c.quantidade - 1 } : c)),
-    )
-
-    // Adicionar à degustação
-    const charutoDegustacao = {
+  const handleAddCigar = (newCigar: Omit<Cigar, "id">) => {
+    const cigar: Cigar = {
+      ...newCigar,
       id: Date.now().toString(),
-      ...tastingData,
     }
+    const updatedCigars = [...cigars, cigar]
+    setCigars(updatedCigars)
+    localStorage.setItem("cigars", JSON.stringify(updatedCigars))
+  }
 
-    const savedTasting = localStorage.getItem("charutos-degustacao")
-    const tastingList = savedTasting ? JSON.parse(savedTasting) : []
-    localStorage.setItem("charutos-degustacao", JSON.stringify([...tastingList, charutoDegustacao]))
+  const handleEditCigar = (updatedCigar: Cigar) => {
+    const updatedCigars = cigars.map((cigar) => (cigar.id === updatedCigar.id ? updatedCigar : cigar))
+    setCigars(updatedCigars)
+    localStorage.setItem("cigars", JSON.stringify(updatedCigars))
+    setEditingCigar(null)
+  }
 
-    alert("Degustação iniciada!")
-    setSelectedCharutoForTasting(null)
+  const handleDeleteCigar = (id: string) => {
+    if (confirm("Tem certeza que deseja excluir este charuto?")) {
+      const updatedCigars = cigars.filter((cigar) => cigar.id !== id)
+      setCigars(updatedCigars)
+      localStorage.setItem("cigars", JSON.stringify(updatedCigars))
+    }
+  }
+
+  const uniqueBrands = Array.from(new Set(cigars.map((cigar) => cigar.brand)))
+  const strengthOptions = ["Suave", "Médio", "Forte", "Muito Forte"]
+
+  const getStrengthColor = (strength: string) => {
+    switch (strength) {
+      case "Suave":
+        return "bg-green-100 text-green-800"
+      case "Médio":
+        return "bg-yellow-100 text-yellow-800"
+      case "Forte":
+        return "bg-orange-100 text-orange-800"
+      case "Muito Forte":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
   return (
-    <div className="min-h-screen bg-orange-50">
-      <Navigation />
-
+    <ProtectedRoute>
       <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Estoque</h1>
-          <p className="text-gray-600">Gerencie seus charutos disponíveis</p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Estoque</h1>
+            <p className="text-gray-600">Gerencie sua coleção de charutos</p>
+          </div>
+          <Button onClick={() => setIsAddModalOpen(true)} className="bg-orange-600 hover:bg-orange-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Charuto
+          </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total de Charutos</p>
-                  <p className="text-3xl font-bold text-gray-900">{charutos.length}</p>
-                  <p className="text-xs text-gray-500">No estoque</p>
-                </div>
-                <Package className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Quantidade Total</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {charutos.reduce((acc, c) => acc + c.quantidade, 0)}
-                  </p>
-                  <p className="text-xs text-gray-500">Unidades</p>
-                </div>
-                <Package className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    R$ {charutos.reduce((acc, c) => acc + c.preco * c.quantidade, 0).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-gray-500">Investimento</p>
-                </div>
-                <Package className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Disponíveis</p>
-                  <p className="text-3xl font-bold text-gray-900">{charutos.filter((c) => c.quantidade > 0).length}</p>
-                  <p className="text-xs text-gray-500">Para degustação</p>
-                </div>
-                <Package className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader className="border-b border-gray-100">
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="text-xl font-semibold text-gray-900">Seus Charutos</CardTitle>
-                <CardDescription className="text-gray-600">Adicione e organize seus charutos</CardDescription>
-              </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
-                    onClick={() => {
-                      setEditingCharuto(null)
-                      setFormData({
-                        nome: "",
-                        marca: "",
-                        paisOrigem: "",
-                        preco: 0,
-                        quantidade: 1,
-                        dataCompra: new Date().toISOString().split("T")[0],
-                        foto: "",
-                      })
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Charuto
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingCharuto ? "Editar Charuto" : "Adicionar Novo Charuto"}</DialogTitle>
-                    <DialogDescription>Preencha as informações do charuto</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="nome">Nome *</Label>
-                        <Input
-                          id="nome"
-                          value={formData.nome || ""}
-                          onChange={(e) => handleInputChange("nome", e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="marca">Marca *</Label>
-                        <Input
-                          id="marca"
-                          value={formData.marca || ""}
-                          onChange={(e) => handleInputChange("marca", e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="paisOrigem">País de Origem</Label>
-                        <Input
-                          id="paisOrigem"
-                          value={formData.paisOrigem || ""}
-                          onChange={(e) => handleInputChange("paisOrigem", e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="dataCompra">Data da Compra</Label>
-                        <Input
-                          id="dataCompra"
-                          type="date"
-                          value={formData.dataCompra || ""}
-                          onChange={(e) => handleInputChange("dataCompra", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="preco">Preço (R$)</Label>
-                        <Input
-                          id="preco"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.preco || 0}
-                          onChange={(e) => handleInputChange("preco", Number.parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="quantidade">Quantidade</Label>
-                        <Input
-                          id="quantidade"
-                          type="number"
-                          min="0"
-                          value={formData.quantidade || 0}
-                          onChange={(e) => handleInputChange("quantidade", Number.parseInt(e.target.value) || 0)}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="foto">Foto do Charuto</Label>
-                      <Input
-                        id="foto"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            const reader = new FileReader()
-                            reader.onload = (e) => {
-                              handleInputChange("foto", e.target?.result as string)
-                            }
-                            reader.readAsDataURL(file)
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button type="submit" className="bg-orange-500 hover:bg-orange-600">
-                        {editingCharuto ? "Salvar Alterações" : "Adicionar Charuto"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
+        {/* Filtros */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
-            {charutos.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2">Nenhum charuto no estoque</p>
-                <p className="text-sm text-gray-500">Adicione o primeiro charuto para começar</p>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar charutos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {charutos.map((charuto) => (
-                  <Card key={charuto.id} className="border border-gray-200 hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg font-semibold text-gray-900">{charuto.nome}</CardTitle>
-                          <CardDescription className="text-gray-600">{charuto.marca}</CardDescription>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(charuto)}>
-                            <Edit className="w-4 h-4 text-gray-500" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(charuto.id)}>
-                            <Trash2 className="w-4 h-4 text-gray-500" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2 mb-4">
-                        {charuto.paisOrigem && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Origem:</strong> {charuto.paisOrigem}
-                          </p>
-                        )}
-                        <p className="text-sm text-gray-600">
-                          <strong>Quantidade:</strong>
-                          <Badge variant={charuto.quantidade > 0 ? "default" : "destructive"} className="ml-2">
-                            {charuto.quantidade}
-                          </Badge>
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Preço:</strong> R$ {charuto.preco.toFixed(2)}
-                        </p>
-                      </div>
-                      <Button
-                        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                        onClick={() => moveToTasting(charuto)}
-                        disabled={charuto.quantidade <= 0}
-                      >
-                        Iniciar Degustação
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+              <Select value={filterBrand} onValueChange={setFilterBrand}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as marcas</SelectItem>
+                  {uniqueBrands.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStrength} onValueChange={setFilterStrength}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por força" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as forças</SelectItem>
+                  {strengthOptions.map((strength) => (
+                    <SelectItem key={strength} value={strength}>
+                      {strength}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Lista de Charutos */}
+        {filteredCigars.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Package className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum charuto encontrado</h3>
+              <p className="text-gray-600 text-center mb-4">
+                {cigars.length === 0
+                  ? "Comece adicionando seu primeiro charuto à coleção."
+                  : "Tente ajustar os filtros para encontrar o que procura."}
+              </p>
+              {cigars.length === 0 && (
+                <Button onClick={() => setIsAddModalOpen(true)} className="bg-orange-600 hover:bg-orange-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Primeiro Charuto
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCigars.map((cigar) => (
+              <Card key={cigar.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{cigar.name}</CardTitle>
+                      <CardDescription>{cigar.brand}</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingCigar(cigar)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCigar(cigar.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Origem:</span>
+                      <span className="text-sm font-medium">{cigar.origin}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Tamanho:</span>
+                      <span className="text-sm font-medium">{cigar.size}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Capa:</span>
+                      <span className="text-sm font-medium">{cigar.wrapper}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Força:</span>
+                      <Badge className={getStrengthColor(cigar.strength)}>{cigar.strength}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Quantidade:</span>
+                      <span className="text-sm font-medium">{cigar.quantity} unidades</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Preço unitário:</span>
+                      <span className="text-sm font-medium">
+                        R$ {cigar.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Valor total:</span>
+                      <span className="text-sm font-bold text-orange-600">
+                        R$ {(cigar.price * cigar.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {cigar.notes && (
+                      <div className="pt-2 border-t">
+                        <span className="text-sm text-gray-600">Notas:</span>
+                        <p className="text-sm mt-1">{cigar.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <AddCigarModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={handleAddCigar}
+          editingCigar={editingCigar}
+          onEdit={handleEditCigar}
+        />
       </div>
-      <TastingDialog
-        charuto={selectedCharutoForTasting}
-        isOpen={isTastingDialogOpen}
-        onClose={() => setIsTastingDialogOpen(false)}
-        onStartTasting={handleStartTasting}
-      />
-    </div>
+    </ProtectedRoute>
   )
 }
