@@ -14,6 +14,11 @@ export function Navigation() {
     { href: "/historico", label: "Histórico" },
   ]
 
+  // Não mostrar navegação na página de login
+  if (pathname === "/login") {
+    return null
+  }
+
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="container mx-auto px-6 py-4">
