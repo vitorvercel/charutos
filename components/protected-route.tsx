@@ -6,7 +6,11 @@ import { useAuth } from "./auth-provider"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+  children: React.ReactNode
+}
+
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
@@ -19,7 +23,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-600"></div>
       </div>
     )
   }

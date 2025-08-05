@@ -4,125 +4,97 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, EyeOff, Wine } from "lucide-react"
-import { toast } from "sonner"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, Eye, EyeOff } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClientComponentClient()
+  const [error, setError] = useState("")
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const { signIn, signUp } = useAuth()
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
+    setError("")
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      await signIn(email, password)
+      toast({
+        title: "Login realizado com sucesso!",
+        description: "Bem-vindo de volta ao Charutos Main.",
       })
-
-      if (error) {
-        toast.error(error.message)
-      } else {
-        toast.success("Login realizado com sucesso!")
-        router.push("/")
-        router.refresh()
-      }
-    } catch (error) {
-      toast.error("Erro inesperado ao fazer login")
+      router.push("/")
+    } catch (error: any) {
+      setError(error.message || "Erro ao fazer login")
+      toast({
+        title: "Erro no login",
+        description: error.message || "Verifique suas credenciais e tente novamente.",
+        variant: "destructive",
+      })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
-    if (password !== confirmPassword) {
-      toast.error("As senhas não coincidem")
-      setIsLoading(false)
-      return
-    }
+    setLoading(true)
+    setError("")
 
     if (password.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres")
-      setIsLoading(false)
+      setError("A senha deve ter pelo menos 6 caracteres")
+      setLoading(false)
       return
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
+      await signUp(email, password, name)
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Verifique seu email para confirmar a conta.",
       })
-
-      if (error) {
-        toast.error(error.message)
-      } else {
-        toast.success("Conta criada com sucesso! Verifique seu email.")
-      }
-    } catch (error) {
-      toast.error("Erro inesperado ao criar conta")
+    } catch (error: any) {
+      setError(error.message || "Erro ao criar conta")
+      toast({
+        title: "Erro ao criar conta",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive",
+      })
     } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) {
-        toast.error(error.message)
-      }
-    } catch (error) {
-      toast.error("Erro ao fazer login com Google")
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <Wine className="h-12 w-12 text-orange-600" />
-          </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Charutos Manager</CardTitle>
-          <CardDescription>Gerencie sua coleção de charutos</CardDescription>
+          <CardTitle className="text-3xl font-bold text-amber-600">Charutos Main</CardTitle>
+          <CardDescription>Gerencie sua coleção de charutos com elegância</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+              <TabsTrigger value="signin">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
+            <TabsContent value="signin">
+              <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -134,7 +106,6 @@ export default function LoginPage() {
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="password">Senha</Label>
                   <div className="relative">
@@ -158,27 +129,21 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
-                  {isLoading ? "Entrando..." : "Entrar"}
-                </Button>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-muted-foreground">Ou</span>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                >
-                  Continuar com Google
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Entrando...
+                    </>
+                  ) : (
+                    "Entrar"
+                  )}
                 </Button>
               </form>
             </TabsContent>
@@ -186,17 +151,16 @@ export default function LoginPage() {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nome completo</Label>
+                  <Label htmlFor="name">Nome</Label>
                   <Input
                     id="name"
                     type="text"
-                    placeholder="Seu nome"
+                    placeholder="Seu nome completo"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
@@ -208,7 +172,6 @@ export default function LoginPage() {
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
                   <div className="relative">
@@ -219,6 +182,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      minLength={6}
                     />
                     <Button
                       type="button"
@@ -232,31 +196,21 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirmar senha</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirm-password"
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirme sua senha"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-                <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
-                  {isLoading ? "Criando conta..." : "Criar conta"}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Criando conta...
+                    </>
+                  ) : (
+                    "Criar Conta"
+                  )}
                 </Button>
               </form>
             </TabsContent>

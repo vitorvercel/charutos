@@ -2,16 +2,15 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
-import { Navigation } from "@/components/navigation"
-import { Toaster } from "sonner"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Charutos Londrina - Dashboard",
-  description: "Aplicativo para gerenciar e avaliar degustações de charutos",
-  generator: "v0.dev",
+  title: "Charutos Main - Gestão de Coleção de Charutos",
+  description: "Sistema completo para gerenciar sua coleção de charutos, degustações e histórico",
 }
 
 export default function RootLayout({
@@ -22,11 +21,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <AuthProvider>
-          <Navigation />
-          <main className="min-h-screen bg-gray-50">{children}</main>
-          <Toaster />
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

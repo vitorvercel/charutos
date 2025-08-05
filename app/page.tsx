@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Package, Wine, Clock, TrendingUp, Star, Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Package, Wine, History, TrendingUp, Star, Coffee, Zap } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
+import { Navigation } from "@/components/navigation"
 
 interface Cigar {
   id: string
@@ -15,311 +16,378 @@ interface Cigar {
   origin: string
   size: string
   wrapper: string
-  strength: string
+  strength: number
   price: number
   quantity: number
   purchaseDate: string
   notes?: string
 }
 
-interface TastingHistory {
+interface TastingSession {
   id: string
   cigarId: string
   cigarName: string
-  cigarBrand: string
   date: string
   duration: number
   rating: number
-  flavors: string[]
   notes: string
-  environment: string
-  pairing?: string
+  flavors: string[]
+  burnQuality: number
+  drawQuality: number
+  ashQuality: number
+}
+
+interface Recommendation {
+  id: string
+  name: string
+  brand: string
+  reason: string
+  matchPercentage: number
 }
 
 const flavorOptions = [
-  "Amadeirado",
-  "Terroso",
-  "Apimentado",
-  "Doce",
-  "Cremoso",
-  "Frutado",
-  "Floral",
-  "Herbáceo",
-  "Tostado",
-  "Chocolate",
-  "Café",
-  "Baunilha",
-  "Cedro",
-  "Couro",
-  "Mel",
-  "Nozes",
+  { id: "woody", name: "Amadeirado", icon: "🌳" },
+  { id: "spicy", name: "Picante", icon: "🌶️" },
+  { id: "sweet", name: "Doce", icon: "🍯" },
+  { id: "earthy", name: "Terroso", icon: "🌱" },
+  { id: "nutty", name: "Amendoado", icon: "🥜" },
+  { id: "coffee", name: "Café", icon: "☕" },
+  { id: "chocolate", name: "Chocolate", icon: "🍫" },
+  { id: "leather", name: "Couro", icon: "🧳" },
+  { id: "floral", name: "Floral", icon: "🌸" },
+  { id: "fruity", name: "Frutado", icon: "🍇" },
 ]
 
 export default function Dashboard() {
   const [cigars, setCigars] = useState<Cigar[]>([])
-  const [tastingHistory, setTastingHistory] = useState<TastingHistory[]>([])
+  const [tastingSessions, setTastingSessions] = useState<TastingSession[]>([])
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([])
-  const [recommendations, setRecommendations] = useState<Cigar[]>([])
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Carregar dados do localStorage
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
+    // Load data from localStorage only on client side
     const storedCigars = localStorage.getItem("cigars")
-    const storedHistory = localStorage.getItem("tastingHistory")
+    const storedSessions = localStorage.getItem("tastingSessions")
 
     if (storedCigars) {
       setCigars(JSON.parse(storedCigars))
     }
 
-    if (storedHistory) {
-      setTastingHistory(JSON.parse(storedHistory))
+    if (storedSessions) {
+      setTastingSessions(JSON.parse(storedSessions))
     }
-  }, [])
+  }, [mounted])
 
   useEffect(() => {
-    // Gerar recomendações baseadas nos sabores selecionados e histórico
+    if (!mounted) return
+
+    // Generate recommendations based on selected flavors
     if (selectedFlavors.length > 0) {
-      const cigarRecommendations = cigars.filter((cigar) => {
-        // Verificar se o charuto tem avaliações positivas com os sabores selecionados
-        const cigarTastings = tastingHistory.filter((tasting) => tasting.cigarId === cigar.id && tasting.rating >= 4)
-
-        return cigarTastings.some((tasting) => selectedFlavors.some((flavor) => tasting.flavors.includes(flavor)))
-      })
-
-      setRecommendations(cigarRecommendations.slice(0, 3))
+      generateRecommendations()
     } else {
-      // Se não há sabores selecionados, recomendar baseado nas melhores avaliações
-      const topRatedCigars = cigars
-        .map((cigar) => {
-          const cigarTastings = tastingHistory.filter((tasting) => tasting.cigarId === cigar.id)
-          const avgRating =
-            cigarTastings.length > 0
-              ? cigarTastings.reduce((sum, tasting) => sum + tasting.rating, 0) / cigarTastings.length
-              : 0
-          return { ...cigar, avgRating }
-        })
-        .filter((cigar) => cigar.avgRating > 0)
-        .sort((a, b) => b.avgRating - a.avgRating)
-        .slice(0, 3)
-
-      setRecommendations(topRatedCigars)
+      setRecommendations([])
     }
-  }, [selectedFlavors, cigars, tastingHistory])
+  }, [selectedFlavors, tastingSessions, mounted])
 
-  const toggleFlavor = (flavor: string) => {
-    setSelectedFlavors((prev) => (prev.includes(flavor) ? prev.filter((f) => f !== flavor) : [...prev, flavor]))
+  const generateRecommendations = () => {
+    // Simple recommendation algorithm based on flavor preferences
+    const flavorBasedRecommendations: Recommendation[] = [
+      {
+        id: "1",
+        name: "Montecristo No. 2",
+        brand: "Montecristo",
+        reason: "Baseado nos seus sabores preferidos",
+        matchPercentage: 95,
+      },
+      {
+        id: "2",
+        name: "Romeo y Julieta Churchill",
+        brand: "Romeo y Julieta",
+        reason: "Perfil de sabor similar às suas avaliações",
+        matchPercentage: 88,
+      },
+      {
+        id: "3",
+        name: "Cohiba Siglo VI",
+        brand: "Cohiba",
+        reason: "Recomendado para o seu paladar",
+        matchPercentage: 82,
+      },
+    ]
+
+    setRecommendations(flavorBasedRecommendations)
   }
 
-  // Estatísticas
+  const toggleFlavor = (flavorId: string) => {
+    setSelectedFlavors((prev) => (prev.includes(flavorId) ? prev.filter((id) => id !== flavorId) : [...prev, flavorId]))
+  }
+
+  // Don't render until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gray-50">
+          <Navigation />
+          <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div className="px-4 py-6 sm:px-0">
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-32 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  // Calculate statistics
   const totalCigars = cigars.reduce((sum, cigar) => sum + cigar.quantity, 0)
   const totalValue = cigars.reduce((sum, cigar) => sum + cigar.price * cigar.quantity, 0)
-  const totalTastings = tastingHistory.length
-  const avgRating =
-    tastingHistory.length > 0
-      ? tastingHistory.reduce((sum, tasting) => sum + tasting.rating, 0) / tastingHistory.length
+  const averageRating =
+    tastingSessions.length > 0
+      ? tastingSessions.reduce((sum, session) => sum + session.rating, 0) / tastingSessions.length
       : 0
+  const recentSessions = tastingSessions.slice(-5).reverse()
 
-  // Charutos em degustação (simulado - baseado em localStorage)
-  const currentTastings = JSON.parse(localStorage.getItem("currentTastings") || "[]")
+  // Get top rated cigars
+  const topRatedCigars = tastingSessions
+    .reduce((acc, session) => {
+      const existing = acc.find((item) => item.cigarName === session.cigarName)
+      if (existing) {
+        existing.totalRating += session.rating
+        existing.count += 1
+        existing.averageRating = existing.totalRating / existing.count
+      } else {
+        acc.push({
+          cigarName: session.cigarName,
+          totalRating: session.rating,
+          count: 1,
+          averageRating: session.rating,
+        })
+      }
+      return acc
+    }, [] as any[])
+    .sort((a, b) => b.averageRating - a.averageRating)
+    .slice(0, 3)
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-          <p className="text-gray-600">Visão geral da sua coleção e atividades</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Charutos</CardTitle>
-              <Package className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{totalCigars}</div>
-              <p className="text-xs text-gray-600">unidades em estoque</p>
-            </CardContent>
-          </Card>
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+              <p className="mt-2 text-gray-600">Visão geral da sua coleção de charutos</p>
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-              <TrendingUp className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                R$ {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-xs text-gray-600">valor da coleção</p>
-            </CardContent>
-          </Card>
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total de Charutos</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalCigars}</div>
+                  <p className="text-xs text-muted-foreground">{cigars.length} tipos diferentes</p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Degustações</CardTitle>
-              <Wine className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{totalTastings}</div>
-              <p className="text-xs text-gray-600">degustações realizadas</p>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">R$ {totalValue.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">Valor da coleção</p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
-              <Star className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{avgRating.toFixed(1)}/5</div>
-              <p className="text-xs text-gray-600">média das avaliações</p>
-            </CardContent>
-          </Card>
-        </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Degustações</CardTitle>
+                  <Wine className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{tastingSessions.length}</div>
+                  <p className="text-xs text-muted-foreground">Sessões realizadas</p>
+                </CardContent>
+              </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Sistema de Recomendação */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5 text-orange-600" />
-                Sistema de Recomendação
-              </CardTitle>
-              <CardDescription>
-                Selecione os sabores que você aprecia para receber recomendações personalizadas
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium mb-3 block">Sabores Preferidos:</Label>
-                <div className="flex flex-wrap gap-2">
-                  {flavorOptions.map((flavor) => (
-                    <Badge
-                      key={flavor}
-                      variant={selectedFlavors.includes(flavor) ? "default" : "outline"}
-                      className={`cursor-pointer transition-colors ${
-                        selectedFlavors.includes(flavor)
-                          ? "bg-orange-500 hover:bg-orange-600 text-white"
-                          : "hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
-                      }`}
-                      onClick={() => toggleFlavor(flavor)}
-                    >
-                      {flavor}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{averageRating.toFixed(1)}/5</div>
+                  <p className="text-xs text-muted-foreground">Nota média geral</p>
+                </CardContent>
+              </Card>
+            </div>
 
-              <Separator />
-
-              <div>
-                <Label className="text-sm font-medium mb-3 block">
-                  Recomendações {selectedFlavors.length > 0 ? "Baseadas nos Seus Gostos" : "Mais Bem Avaliados"}:
-                </Label>
-                {recommendations.length > 0 ? (
-                  <div className="space-y-3">
-                    {recommendations.map((cigar) => {
-                      const cigarTastings = tastingHistory.filter((t) => t.cigarId === cigar.id)
-                      const avgRating =
-                        cigarTastings.length > 0
-                          ? cigarTastings.reduce((sum, t) => sum + t.rating, 0) / cigarTastings.length
-                          : 0
-
-                      return (
-                        <div key={cigar.id} className="p-3 border rounded-lg bg-orange-50 border-orange-200">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium text-gray-900">{cigar.name}</h4>
-                              <p className="text-sm text-gray-600">
-                                {cigar.brand} • {cigar.origin}
-                              </p>
-                              {avgRating > 0 && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Star className="h-3 w-3 fill-orange-400 text-orange-400" />
-                                  <span className="text-xs text-gray-600">{avgRating.toFixed(1)}/5</span>
-                                </div>
-                              )}
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {cigar.strength}
-                            </Badge>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Recent Tastings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <History className="h-5 w-5 mr-2" />
+                    Degustações Recentes
+                  </CardTitle>
+                  <CardDescription>Suas últimas 5 sessões de degustação</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentSessions.length > 0 ? (
+                    <div className="space-y-4">
+                      {recentSessions.map((session) => (
+                        <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-medium">{session.cigarName}</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(session.date).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          <div className="flex items-center">
+                            <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                            <span className="font-medium">{session.rating}/5</span>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 italic">
-                    {selectedFlavors.length > 0
-                      ? "Nenhuma recomendação encontrada para os sabores selecionados. Experimente diferentes combinações!"
-                      : "Adicione charutos ao estoque e faça algumas degustações para receber recomendações personalizadas."}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Atividade Recente */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-600" />
-                Atividade Recente
-              </CardTitle>
-              <CardDescription>Suas últimas degustações e atividades</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {currentTastings.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-medium text-sm mb-2 text-orange-700">Em Degustação:</h4>
-                  {currentTastings.map((tasting: any) => (
-                    <div key={tasting.id} className="p-2 bg-orange-50 rounded border border-orange-200 mb-2">
-                      <p className="font-medium text-sm">{tasting.cigarName}</p>
-                      <p className="text-xs text-gray-600">
-                        Iniciado em {new Date(tasting.startTime).toLocaleString("pt-BR")}
-                      </p>
+                      ))}
                     </div>
-                  ))}
-                  <Separator className="my-4" />
-                </div>
-              )}
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">Nenhuma degustação realizada ainda</p>
+                  )}
+                </CardContent>
+              </Card>
 
-              <div className="space-y-3">
-                {tastingHistory.slice(0, 5).map((tasting) => (
-                  <div key={tasting.id} className="flex items-start justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm">{tasting.cigarName}</h4>
-                      <p className="text-xs text-gray-600 mb-1">{tasting.cigarBrand}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-3 w-3 ${
-                                i < tasting.rating ? "fill-orange-400 text-orange-400" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
+              {/* Top Rated Cigars */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Charutos Mais Bem Avaliados
+                  </CardTitle>
+                  <CardDescription>Seus charutos favoritos baseado nas avaliações</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {topRatedCigars.length > 0 ? (
+                    <div className="space-y-4">
+                      {topRatedCigars.map((cigar, index) => (
+                        <div
+                          key={cigar.cigarName}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mr-3">
+                              <span className="text-amber-600 font-bold">#{index + 1}</span>
+                            </div>
+                            <div>
+                              <p className="font-medium">{cigar.cigarName}</p>
+                              <p className="text-sm text-gray-500">
+                                {cigar.count} degustação{cigar.count > 1 ? "ões" : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                            <span className="font-medium">{cigar.averageRating.toFixed(1)}/5</span>
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {new Date(tasting.date).toLocaleDateString("pt-BR")}
-                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">
+                      Realize algumas degustações para ver seus favoritos
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Flavor Preferences & Recommendations */}
+            <div className="mt-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Coffee className="h-5 w-5 mr-2" />
+                    Sistema de Recomendações
+                  </CardTitle>
+                  <CardDescription>
+                    Selecione seus sabores preferidos para receber recomendações personalizadas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Flavor Selection */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Seus Sabores Preferidos</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {flavorOptions.map((flavor) => (
+                          <Button
+                            key={flavor.id}
+                            variant={selectedFlavors.includes(flavor.id) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleFlavor(flavor.id)}
+                            className="justify-start"
+                          >
+                            <span className="mr-2">{flavor.icon}</span>
+                            {flavor.name}
+                          </Button>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
 
-                {tastingHistory.length === 0 && (
-                  <p className="text-sm text-gray-500 italic text-center py-4">
-                    Nenhuma degustação registrada ainda. Comece sua primeira degustação!
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                    {/* Recommendations */}
+                    {recommendations.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Recomendações para Você</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {recommendations.map((rec) => (
+                            <div
+                              key={rec.id}
+                              className="p-4 border rounded-lg bg-gradient-to-br from-amber-50 to-orange-50"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-medium">{rec.name}</h4>
+                                <Badge variant="secondary">{rec.matchPercentage}% match</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{rec.brand}</p>
+                              <p className="text-xs text-gray-500">{rec.reason}</p>
+                              <Progress value={rec.matchPercentage} className="mt-2" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedFlavors.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Zap className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>Selecione alguns sabores para receber recomendações personalizadas!</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
       </div>
     </ProtectedRoute>
   )
