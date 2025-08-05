@@ -1,566 +1,408 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
-import { Navigation } from "@/components/navigation"
-import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Navigation } from "@/components/navigation"
+import { Square, Clock, Flame, Play, Plus } from "lucide-react"
+import { FinishTastingDialog } from "@/components/finish-tasting-dialog"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Play, Square, Wine, Clock, Star } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { TastingDialog } from "@/components/tasting-dialog"
 
-interface Cigar {
+interface CharutoDegustacao {
   id: string
-  name: string
-  brand: string
-  origin: string
-  size: string
-  wrapper: string
-  strength: number
-  price: number
-  quantity: number
-  purchaseDate: string
-  notes?: string
-}
+  charuteId: string
+  nome: string
+  marca: string
+  paisOrigem: string
+  dataInicio: string
+  dataFim?: string
+  status: "em-degustacao" | "finalizado"
 
-interface TastingSession {
-  id: string
-  cigarId: string
-  cigarName: string
-  cigarBrand: string
-  startTime: string
-  endTime?: string
-  duration?: number
-  rating?: number
-  notes?: string
-  flavors?: string[]
-  burnQuality?: number
-  drawQuality?: number
-  ashQuality?: number
-  environment?: string
-  pairing?: string
-}
+  // Dados da etapa 2 (início da degustação)
+  corte?: string
+  momento?: string
+  fluxo?: string
 
-const flavorOptions = [
-  "Amadeirado",
-  "Terroso",
-  "Picante",
-  "Doce",
-  "Cremoso",
-  "Frutado",
-  "Floral",
-  "Herbáceo",
-  "Tostado",
-  "Chocolate",
-  "Café",
-  "Baunilha",
-  "Cedro",
-  "Couro",
-  "Mel",
-  "Nozes",
-]
+  // Dados da etapa 3 (finalização)
+  sabores?: string[]
+  avaliacao?: number
+  duracaoFumo?: number
+  comprariaNovamente?: string
+  observacoes?: string
+  fotoAnilha?: string
+}
 
 export default function DegustacaoPage() {
-  const [cigars, setCigars] = useState<Cigar[]>([])
-  const [currentSessions, setCurrentSessions] = useState<TastingSession[]>([])
-  const [completedSessions, setCompletedSessions] = useState<TastingSession[]>([])
-  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false)
-  const [finishingSession, setFinishingSession] = useState<TastingSession | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const [charutosDegustacao, setCharutosDegustacao] = useState<CharutoDegustacao[]>([])
+  const [selectedCharuto, setSelectedCharuto] = useState<CharutoDegustacao | null>(null)
+  const [isFinishDialogOpen, setIsFinishDialogOpen] = useState(false)
+  const [notas, setNotas] = useState("")
+  const [avaliacao, setAvaliacao] = useState<number>(5)
 
-  const [finishFormData, setFinishFormData] = useState({
-    rating: 5,
-    notes: "",
-    flavors: [] as string[],
-    burnQuality: 5,
-    drawQuality: 5,
-    ashQuality: 5,
-    environment: "",
-    pairing: "",
-  })
+  const [isStartTastingDialogOpen, setIsStartTastingDialogOpen] = useState(false)
+  const [charutosDisponiveis, setCharutosDisponiveis] = useState<any[]>([])
+  const [selectedCharutoForTasting, setSelectedCharutoForTasting] = useState<any>(null)
+  const [isTastingDialogOpen, setIsTastingDialogOpen] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const savedTasting = localStorage.getItem("charutos-degustacao")
+    if (savedTasting) {
+      setCharutosDegustacao(JSON.parse(savedTasting))
+    }
+
+    // Carregar charutos disponíveis
+    const estoque = JSON.parse(localStorage.getItem("charutos-estoque") || "[]")
+    setCharutosDisponiveis(estoque.filter((c: any) => c.quantidade > 0))
   }, [])
 
   useEffect(() => {
-    if (!mounted) return
+    localStorage.setItem("charutos-degustacao", JSON.stringify(charutosDegustacao))
+  }, [charutosDegustacao])
 
-    const storedCigars = localStorage.getItem("cigars")
-    const storedCurrentSessions = localStorage.getItem("currentTastingSessions")
-    const storedCompletedSessions = localStorage.getItem("tastingSessions")
+  const finalizarDegustacao = (charuto: CharutoDegustacao) => {
+    setSelectedCharuto(charuto)
+    setNotas(charuto.notas || "")
+    setAvaliacao(charuto.avaliacao || 5)
+    setIsFinishDialogOpen(true)
+  }
 
-    if (storedCigars) {
-      setCigars(JSON.parse(storedCigars))
+  const handleFinalizarDegustacao = (finishData: any) => {
+    if (!selectedCharuto) return
+
+    const charutoFinalizado: CharutoDegustacao = {
+      ...selectedCharuto,
+      status: "finalizado",
+      ...finishData,
     }
 
-    if (storedCurrentSessions) {
-      setCurrentSessions(JSON.parse(storedCurrentSessions))
+    setCharutosDegustacao((prev) => prev.map((c) => (c.id === selectedCharuto.id ? charutoFinalizado : c)))
+
+    const savedHistory = localStorage.getItem("charutos-historico")
+    const historyList = savedHistory ? JSON.parse(savedHistory) : []
+    localStorage.setItem("charutos-historico", JSON.stringify([...historyList, charutoFinalizado]))
+
+    setSelectedCharuto(null)
+  }
+
+  const removerDaDegustacao = (id: string) => {
+    if (confirm("Tem certeza que deseja remover este charuto da degustação?")) {
+      setCharutosDegustacao((prev) => prev.filter((c) => c.id !== id))
     }
-
-    if (storedCompletedSessions) {
-      setCompletedSessions(JSON.parse(storedCompletedSessions))
-    }
-  }, [mounted])
-
-  const saveCurrentSessions = (sessions: TastingSession[]) => {
-    if (!mounted) return
-    setCurrentSessions(sessions)
-    localStorage.setItem("currentTastingSessions", JSON.stringify(sessions))
   }
 
-  const saveCompletedSessions = (sessions: TastingSession[]) => {
-    if (!mounted) return
-    setCompletedSessions(sessions)
-    localStorage.setItem("tastingSessions", JSON.stringify(sessions))
-  }
+  const charutosEmDegustacao = charutosDegustacao.filter((c) => c.status === "em-degustacao")
+  const charutosFinalizados = charutosDegustacao.filter((c) => c.status === "finalizado")
 
-  const startTasting = (cigar: Cigar) => {
-    const newSession: TastingSession = {
-      id: Date.now().toString(),
-      cigarId: cigar.id,
-      cigarName: cigar.name,
-      cigarBrand: cigar.brand,
-      startTime: new Date().toISOString(),
-    }
+  const formatarTempo = (dataInicio: string) => {
+    const inicio = new Date(dataInicio)
+    const agora = new Date()
+    const diffMinutos = Math.floor((agora.getTime() - inicio.getTime()) / (1000 * 60))
 
-    saveCurrentSessions([...currentSessions, newSession])
-    setIsStartDialogOpen(false)
-
-    toast({
-      title: "Degustação iniciada",
-      description: `Degustação do ${cigar.name} iniciada com sucesso.`,
-    })
-  }
-
-  const finishTasting = (session: TastingSession) => {
-    setFinishingSession(session)
-    setFinishFormData({
-      rating: 5,
-      notes: "",
-      flavors: [],
-      burnQuality: 5,
-      drawQuality: 5,
-      ashQuality: 5,
-      environment: "",
-      pairing: "",
-    })
-  }
-
-  const handleFinishSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!finishingSession) return
-
-    const endTime = new Date().toISOString()
-    const duration = Math.round(
-      (new Date(endTime).getTime() - new Date(finishingSession.startTime).getTime()) / (1000 * 60),
-    )
-
-    const completedSession: TastingSession = {
-      ...finishingSession,
-      endTime,
-      duration,
-      ...finishFormData,
-    }
-
-    // Remove from current sessions
-    const updatedCurrentSessions = currentSessions.filter((s) => s.id !== finishingSession.id)
-    saveCurrentSessions(updatedCurrentSessions)
-
-    // Add to completed sessions
-    saveCompletedSessions([...completedSessions, completedSession])
-
-    setFinishingSession(null)
-
-    toast({
-      title: "Degustação finalizada",
-      description: `Degustação do ${finishingSession.cigarName} finalizada e salva.`,
-    })
-  }
-
-  const cancelTasting = (sessionId: string) => {
-    const updatedSessions = currentSessions.filter((s) => s.id !== sessionId)
-    saveCurrentSessions(updatedSessions)
-
-    toast({
-      title: "Degustação cancelada",
-      description: "A degustação foi cancelada.",
-    })
-  }
-
-  const formatDuration = (startTime: string) => {
-    const now = new Date()
-    const start = new Date(startTime)
-    const diffMinutes = Math.round((now.getTime() - start.getTime()) / (1000 * 60))
-
-    if (diffMinutes < 60) {
-      return `${diffMinutes} min`
+    if (diffMinutos < 60) {
+      return `${diffMinutos} min`
     } else {
-      const hours = Math.floor(diffMinutes / 60)
-      const minutes = diffMinutes % 60
-      return `${hours}h ${minutes}min`
+      const horas = Math.floor(diffMinutos / 60)
+      const minutos = diffMinutos % 60
+      return `${horas}h ${minutos}min`
     }
   }
 
-  const toggleFlavor = (flavor: string) => {
-    setFinishFormData((prev) => ({
-      ...prev,
-      flavors: prev.flavors.includes(flavor) ? prev.flavors.filter((f) => f !== flavor) : [...prev.flavors, flavor],
-    }))
+  const handleStartTastingFromDegustacao = (charuto: any) => {
+    setSelectedCharutoForTasting(charuto)
+    setIsStartTastingDialogOpen(false)
+    setIsTastingDialogOpen(true)
   }
 
-  const availableCigars = cigars.filter((cigar) => cigar.quantity > 0)
+  const handleStartTasting = (tastingData: any) => {
+    if (!selectedCharutoForTasting) return
 
-  if (!mounted) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <Navigation />
-          <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div className="px-4 py-6 sm:px-0">
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-              </div>
-            </div>
-          </main>
-        </div>
-      </ProtectedRoute>
+    // Reduzir quantidade no estoque
+    const estoque = JSON.parse(localStorage.getItem("charutos-estoque") || "[]")
+    const estoqueAtualizado = estoque.map((c: any) =>
+      c.id === selectedCharutoForTasting.id ? { ...c, quantidade: c.quantidade - 1 } : c,
     )
+    localStorage.setItem("charutos-estoque", JSON.stringify(estoqueAtualizado))
+
+    // Adicionar à degustação
+    const charutoDegustacao = {
+      id: Date.now().toString(),
+      ...tastingData,
+    }
+
+    const savedTasting = localStorage.getItem("charutos-degustacao")
+    const tastingList = savedTasting ? JSON.parse(savedTasting) : []
+    const updatedTasting = [...tastingList, charutoDegustacao]
+    localStorage.setItem("charutos-degustacao", JSON.stringify(updatedTasting))
+    setCharutosDegustacao(updatedTasting)
+
+    alert("Degustação iniciada!")
+    setSelectedCharutoForTasting(null)
   }
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
+    <div className="min-h-screen bg-orange-50">
+      <Navigation />
 
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Degustação de Charutos</h1>
-              <p className="mt-2 text-gray-600">Inicie e acompanhe suas sessões de degustação</p>
-            </div>
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Degustação</h1>
+          <p className="text-gray-600">Acompanhe suas experiências em tempo real</p>
+        </div>
 
-            {/* Current Sessions */}
-            {currentSessions.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Degustações em Andamento</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {currentSessions.map((session) => (
-                    <Card key={session.id} className="border-amber-200 bg-amber-50">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-lg">{session.cigarName}</CardTitle>
-                            <CardDescription>{session.cigarBrand}</CardDescription>
-                          </div>
-                          <Badge className="bg-green-100 text-green-800">Em andamento</Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Clock className="h-4 w-4 mr-2" />
-                            Iniciado: {new Date(session.startTime).toLocaleString("pt-BR")}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Wine className="h-4 w-4 mr-2" />
-                            Duração: {formatDuration(session.startTime)}
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button size="sm" onClick={() => finishTasting(session)} className="flex-1">
-                              <Square className="h-4 w-4 mr-2" />
-                              Finalizar
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => cancelTasting(session.id)}>
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Em Degustação</p>
+                  <p className="text-3xl font-bold text-gray-900">{charutosEmDegustacao.length}</p>
+                  <p className="text-xs text-gray-500">Ativos agora</p>
                 </div>
+                <Play className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Finalizadas</p>
+                  <p className="text-3xl font-bold text-gray-900">{charutosFinalizados.length}</p>
+                  <p className="text-xs text-gray-500">Hoje</p>
+                </div>
+                <Square className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Tempo Médio</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {charutosFinalizados.length > 0
+                      ? Math.round(
+                          charutosFinalizados.reduce((acc, c) => acc + (c.duracaoFumo || 0), 0) /
+                            charutosFinalizados.length,
+                        )
+                      : 0}
+                  </p>
+                  <p className="text-xs text-gray-500">Minutos</p>
+                </div>
+                <Clock className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avaliação Média</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {charutosFinalizados.length > 0
+                      ? (
+                          charutosFinalizados.reduce((acc, c) => acc + (c.avaliacao || 0), 0) /
+                          charutosFinalizados.length
+                        ).toFixed(1)
+                      : "0.0"}
+                  </p>
+                  <p className="text-xs text-gray-500">De 10</p>
+                </div>
+                <Flame className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Em Degustação */}
+        <Card className="bg-white border-0 shadow-sm mb-8">
+          <CardHeader className="border-b border-gray-100">
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Flame className="w-6 h-6 mr-2 text-orange-500" />
+                  Em Degustação ({charutosEmDegustacao.length})
+                </CardTitle>
+                <CardDescription className="text-gray-600">Charutos que você está fumando agora</CardDescription>
+              </div>
+              <Button
+                className="bg-green-500 hover:bg-green-600 text-white"
+                onClick={() => setIsStartTastingDialogOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Iniciar Nova Degustação
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {charutosEmDegustacao.length === 0 ? (
+              <div className="text-center py-12">
+                <Flame className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-2">Nenhum charuto em degustação</p>
+                <p className="text-sm text-gray-500">Vá para o estoque e inicie uma degustação!</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {charutosEmDegustacao.map((charuto) => (
+                  <Card key={charuto.id} className="border-2 border-orange-200 bg-orange-50">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg font-semibold text-gray-900">{charuto.nome}</CardTitle>
+                          <CardDescription className="text-gray-600">{charuto.marca}</CardDescription>
+                        </div>
+                        <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {formatarTempo(charuto.dataInicio)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2 mb-4">
+                        {charuto.paisOrigem && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Origem:</strong> {charuto.paisOrigem}
+                          </p>
+                        )}
+                        {charuto.vitola && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Vitola:</strong> {charuto.vitola}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          <strong>Iniciado:</strong> {new Date(charuto.dataInicio).toLocaleString("pt-BR")}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+                          onClick={() => finalizarDegustacao(charuto)}
+                        >
+                          <Square className="w-4 h-4 mr-2" />
+                          Finalizar
+                        </Button>
+                        <Button variant="outline" onClick={() => removerDaDegustacao(charuto.id)}>
+                          Remover
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
+          </CardContent>
+        </Card>
 
-            {/* Start New Tasting */}
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Iniciar Nova Degustação</h2>
-                <Dialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Play className="h-4 w-4 mr-2" />
-                      Iniciar Degustação
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Selecionar Charuto</DialogTitle>
-                      <DialogDescription>
-                        Escolha um charuto do seu estoque para iniciar a degustação.
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                      {availableCigars.length > 0 ? (
-                        <div className="grid gap-3 max-h-96 overflow-y-auto">
-                          {availableCigars.map((cigar) => (
-                            <div
-                              key={cigar.id}
-                              className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                              onClick={() => startTasting(cigar)}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h4 className="font-medium">{cigar.name}</h4>
-                                  <p className="text-sm text-gray-600">{cigar.brand}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {cigar.origin} • {cigar.size} • Força {cigar.strength}/5
-                                  </p>
-                                </div>
-                                <Badge variant="outline">{cigar.quantity} disponível</Badge>
-                              </div>
-                            </div>
-                          ))}
+        {/* Finalizados Recentemente */}
+        {charutosFinalizados.length > 0 && (
+          <Card className="bg-white border-0 shadow-sm">
+            <CardHeader className="border-b border-gray-100">
+              <CardTitle className="text-xl font-semibold text-gray-900">Finalizados Recentemente</CardTitle>
+              <CardDescription className="text-gray-600">Suas últimas degustações</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {charutosFinalizados.slice(0, 6).map((charuto) => (
+                  <Card key={charuto.id} className="border-2 border-green-200 bg-green-50">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg font-semibold text-gray-900">{charuto.nome}</CardTitle>
+                          <CardDescription className="text-gray-600">{charuto.marca}</CardDescription>
                         </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <Wine className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-600">
-                            Nenhum charuto disponível no estoque. Adicione charutos primeiro.
+                        <Badge className="bg-green-100 text-green-800 border-green-200">
+                          ⭐ {charuto.avaliacao}/10
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-600">
+                          <strong>Tempo fumado:</strong> {charuto.duracaoFumo} min
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Finalizado:</strong>{" "}
+                          {charuto.dataFim ? new Date(charuto.dataFim).toLocaleString("pt-BR") : "N/A"}
+                        </p>
+                        {charuto.observacoes && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Notas:</strong> {charuto.observacoes.substring(0, 100)}
+                            {charuto.observacoes.length > 100 ? "..." : ""}
                           </p>
-                        </div>
-                      )}
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Recent Completed Sessions */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Degustações Recentes</h2>
-              {completedSessions.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {completedSessions
-                    .slice(-6)
-                    .reverse()
-                    .map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg">{session.cigarName}</CardTitle>
-                              <CardDescription>{session.cigarBrand}</CardDescription>
-                            </div>
-                            <div className="flex items-center">
-                              <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                              <span className="font-medium">{session.rating}/5</span>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Data:</span>
-                              <span>{new Date(session.startTime).toLocaleDateString("pt-BR")}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Duração:</span>
-                              <span>{session.duration} min</span>
-                            </div>
-                            {session.flavors && session.flavors.length > 0 && (
-                              <div>
-                                <span className="text-sm text-gray-600">Sabores:</span>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {session.flavors.slice(0, 3).map((flavor) => (
-                                    <Badge key={flavor} variant="secondary" className="text-xs">
-                                      {flavor}
-                                    </Badge>
-                                  ))}
-                                  {session.flavors.length > 3 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      +{session.flavors.length - 3}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            {session.notes && (
-                              <div>
-                                <span className="text-sm text-gray-600">Notas:</span>
-                                <p className="text-sm mt-1 text-gray-800 line-clamp-2">{session.notes}</p>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
+        {/* Dialog para finalizar degustação */}
+        <FinishTastingDialog
+          charuto={selectedCharuto}
+          isOpen={isFinishDialogOpen}
+          onClose={() => setIsFinishDialogOpen(false)}
+          onFinish={handleFinalizarDegustacao}
+        />
+
+        {/* Dialog para selecionar charuto para degustação */}
+        <Dialog open={isStartTastingDialogOpen} onOpenChange={setIsStartTastingDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Selecionar Charuto para Degustação</DialogTitle>
+              <DialogDescription>Escolha um charuto disponível no seu estoque</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {charutosDisponiveis.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">Nenhum charuto disponível no estoque</p>
               ) : (
-                <div className="text-center py-12">
-                  <Wine className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma degustação realizada</h3>
-                  <p className="text-gray-600 mb-4">
-                    Inicie sua primeira degustação para começar a registrar suas experiências.
-                  </p>
-                </div>
+                charutosDisponiveis.map((charuto) => (
+                  <div
+                    key={charuto.id}
+                    className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleStartTastingFromDegustacao(charuto)}
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{charuto.nome}</p>
+                      <p className="text-sm text-gray-600">{charuto.marca}</p>
+                    </div>
+                    <Badge variant="secondary">{charuto.quantidade}</Badge>
+                  </div>
+                ))
               )}
             </div>
-          </div>
-        </main>
-
-        {/* Finish Tasting Dialog */}
-        <Dialog open={!!finishingSession} onOpenChange={() => setFinishingSession(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Finalizar Degustação</DialogTitle>
-              <DialogDescription>Avalie sua experiência com {finishingSession?.cigarName}</DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleFinishSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Avaliação Geral</Label>
-                  <Select
-                    value={finishFormData.rating.toString()}
-                    onValueChange={(value) => setFinishFormData({ ...finishFormData, rating: Number.parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Muito Ruim</SelectItem>
-                      <SelectItem value="2">2 - Ruim</SelectItem>
-                      <SelectItem value="3">3 - Regular</SelectItem>
-                      <SelectItem value="4">4 - Bom</SelectItem>
-                      <SelectItem value="5">5 - Excelente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Qualidade da Queima</Label>
-                  <Select
-                    value={finishFormData.burnQuality.toString()}
-                    onValueChange={(value) =>
-                      setFinishFormData({ ...finishFormData, burnQuality: Number.parseInt(value) })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Muito Ruim</SelectItem>
-                      <SelectItem value="2">2 - Ruim</SelectItem>
-                      <SelectItem value="3">3 - Regular</SelectItem>
-                      <SelectItem value="4">4 - Boa</SelectItem>
-                      <SelectItem value="5">5 - Excelente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Qualidade do Tiragem</Label>
-                  <Select
-                    value={finishFormData.drawQuality.toString()}
-                    onValueChange={(value) =>
-                      setFinishFormData({ ...finishFormData, drawQuality: Number.parseInt(value) })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Muito Ruim</SelectItem>
-                      <SelectItem value="2">2 - Ruim</SelectItem>
-                      <SelectItem value="3">3 - Regular</SelectItem>
-                      <SelectItem value="4">4 - Boa</SelectItem>
-                      <SelectItem value="5">5 - Excelente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Sabores Identificados</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {flavorOptions.map((flavor) => (
-                    <div key={flavor} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={flavor}
-                        checked={finishFormData.flavors.includes(flavor)}
-                        onCheckedChange={() => toggleFlavor(flavor)}
-                      />
-                      <Label htmlFor={flavor} className="text-sm">
-                        {flavor}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="environment">Ambiente</Label>
-                  <Input
-                    id="environment"
-                    value={finishFormData.environment}
-                    onChange={(e) => setFinishFormData({ ...finishFormData, environment: e.target.value })}
-                    placeholder="ex: Terraço, Escritório, Clube"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pairing">Harmonização</Label>
-                  <Input
-                    id="pairing"
-                    value={finishFormData.pairing}
-                    onChange={(e) => setFinishFormData({ ...finishFormData, pairing: e.target.value })}
-                    placeholder="ex: Whisky, Café, Vinho"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea
-                  id="notes"
-                  value={finishFormData.notes}
-                  onChange={(e) => setFinishFormData({ ...finishFormData, notes: e.target.value })}
-                  placeholder="Descreva sua experiência, impressões e detalhes da degustação..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setFinishingSession(null)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">Finalizar Degustação</Button>
-              </div>
-            </form>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsStartTastingDialogOpen(false)}>
+                Cancelar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog de degustação */}
+        <TastingDialog
+          charuto={selectedCharutoForTasting}
+          isOpen={isTastingDialogOpen}
+          onClose={() => setIsTastingDialogOpen(false)}
+          onStartTasting={handleStartTasting}
+        />
       </div>
-    </ProtectedRoute>
+    </div>
   )
 }

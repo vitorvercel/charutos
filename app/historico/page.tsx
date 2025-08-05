@@ -2,449 +2,359 @@
 
 import { useState, useEffect } from "react"
 import { Navigation } from "@/components/navigation"
-import { ProtectedRoute } from "@/components/protected-route"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Search, Star, Clock, Wine, Filter, Calendar, TrendingUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Clock, Star, Flame, Search, Eye } from "lucide-react"
 
-interface TastingSession {
+interface HistoricoItem {
   id: string
-  cigarId: string
-  cigarName: string
-  cigarBrand: string
-  startTime: string
-  endTime?: string
-  duration?: number
-  rating?: number
-  notes?: string
-  flavors?: string[]
-  burnQuality?: number
-  drawQuality?: number
-  ashQuality?: number
-  environment?: string
-  pairing?: string
+  nome: string
+  marca: string
+  paisOrigem: string
+  avaliacao: number
+  duracaoFumo: number
+  dataFim: string
+  sabores: string[]
+  observacoes: string
+  comprariaNovamente: string
+  corte?: string
+  momento?: string
+  fluxo?: string
+  fotoAnilha?: string
 }
 
 export default function HistoricoPage() {
-  const [sessions, setSessions] = useState<TastingSession[]>([])
-  const [filteredSessions, setFilteredSessions] = useState<TastingSession[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [ratingFilter, setRatingFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("date-desc")
-  const [selectedSession, setSelectedSession] = useState<TastingSession | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const [historico, setHistorico] = useState<HistoricoItem[]>([])
+  const [filtroTexto, setFiltroTexto] = useState("")
+  const [filtroAvaliacao, setFiltroAvaliacao] = useState("todas")
+  const [selectedCharuto, setSelectedCharuto] = useState<HistoricoItem | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const savedHistory = localStorage.getItem("charutos-historico")
+    if (savedHistory) {
+      setHistorico(JSON.parse(savedHistory))
+    }
   }, [])
 
-  useEffect(() => {
-    if (!mounted) return
+  const historicoFiltrado = historico.filter((item) => {
+    const matchTexto =
+      item.nome.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+      item.marca.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+      item.paisOrigem.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+      item.observacoes.toLowerCase().includes(filtroTexto.toLowerCase())
 
-    const storedSessions = localStorage.getItem("tastingSessions")
-    if (storedSessions) {
-      const parsedSessions = JSON.parse(storedSessions)
-      setSessions(parsedSessions)
-      setFilteredSessions(parsedSessions)
-    }
-  }, [mounted])
+    const matchAvaliacao =
+      filtroAvaliacao === "todas" ||
+      (filtroAvaliacao === "9-10" && item.avaliacao >= 9) ||
+      (filtroAvaliacao === "7-8" && item.avaliacao >= 7 && item.avaliacao < 9) ||
+      (filtroAvaliacao === "5-6" && item.avaliacao >= 5 && item.avaliacao < 7) ||
+      (filtroAvaliacao === "3-4" && item.avaliacao >= 3 && item.avaliacao < 5) ||
+      (filtroAvaliacao === "1-2" && item.avaliacao >= 1 && item.avaliacao < 3)
 
-  useEffect(() => {
-    const filtered = sessions.filter((session) => {
-      const matchesSearch =
-        session.cigarName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.cigarBrand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (session.notes && session.notes.toLowerCase().includes(searchTerm.toLowerCase()))
+    return matchTexto && matchAvaliacao
+  })
 
-      const matchesRating =
-        ratingFilter === "all" ||
-        (ratingFilter === "5" && session.rating === 5) ||
-        (ratingFilter === "4+" && session.rating && session.rating >= 4) ||
-        (ratingFilter === "3+" && session.rating && session.rating >= 3) ||
-        (ratingFilter === "low" && session.rating && session.rating < 3)
+  const totalDegustacoes = historico.length
+  const tempoMedio =
+    historico.length > 0 ? Math.round(historico.reduce((acc, h) => acc + h.duracaoFumo, 0) / historico.length) : 0
+  const avaliacaoMedia =
+    historico.length > 0 ? (historico.reduce((acc, h) => acc + h.avaliacao, 0) / historico.length).toFixed(1) : "0.0"
+  const melhorAvaliacao = historico.length > 0 ? Math.max(...historico.map((h) => h.avaliacao)) : 0
 
-      return matchesSearch && matchesRating
-    })
-
-    // Sort sessions
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "date-desc":
-          return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-        case "date-asc":
-          return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-        case "rating-desc":
-          return (b.rating || 0) - (a.rating || 0)
-        case "rating-asc":
-          return (a.rating || 0) - (b.rating || 0)
-        case "duration-desc":
-          return (b.duration || 0) - (a.duration || 0)
-        case "duration-asc":
-          return (a.duration || 0) - (b.duration || 0)
-        default:
-          return 0
-      }
-    })
-
-    setFilteredSessions(filtered)
-  }, [sessions, searchTerm, ratingFilter, sortBy])
-
-  const getAverageRating = () => {
-    if (sessions.length === 0) return 0
-    const totalRating = sessions.reduce((sum, session) => sum + (session.rating || 0), 0)
-    return totalRating / sessions.length
+  const openModal = (charuto: HistoricoItem) => {
+    setSelectedCharuto(charuto)
+    setIsModalOpen(true)
   }
-
-  const getTotalDuration = () => {
-    return sessions.reduce((sum, session) => sum + (session.duration || 0), 0)
-  }
-
-  const getMostCommonFlavors = () => {
-    const flavorCount: { [key: string]: number } = {}
-    sessions.forEach((session) => {
-      session.flavors?.forEach((flavor) => {
-        flavorCount[flavor] = (flavorCount[flavor] || 0) + 1
-      })
-    })
-
-    return Object.entries(flavorCount)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([flavor, count]) => ({ flavor, count }))
-  }
-
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) {
-      return `${minutes} min`
-    } else {
-      const hours = Math.floor(minutes / 60)
-      const remainingMinutes = minutes % 60
-      return `${hours}h ${remainingMinutes}min`
-    }
-  }
-
-  if (!mounted) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <Navigation />
-          <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div className="px-4 py-6 sm:px-0">
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-              </div>
-            </div>
-          </main>
-        </div>
-      </ProtectedRoute>
-    )
-  }
-
-  const averageRating = getAverageRating()
-  const totalDuration = getTotalDuration()
-  const commonFlavors = getMostCommonFlavors()
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
+    <div className="min-h-screen bg-orange-50">
+      <Navigation />
 
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Histórico de Degustações</h1>
-              <p className="mt-2 text-gray-600">Revise e analise suas experiências passadas</p>
-            </div>
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Histórico</h1>
+          <p className="text-gray-600">Revise suas avaliações anteriores</p>
+        </div>
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total de Degustações</CardTitle>
-                  <Wine className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{sessions.length}</div>
-                  <p className="text-xs text-muted-foreground">Sessões realizadas</p>
-                </CardContent>
-              </Card>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total de Degustações</p>
+                  <p className="text-3xl font-bold text-gray-900">{totalDegustacoes}</p>
+                  <p className="text-xs text-gray-500">Registradas</p>
+                </div>
+                <Clock className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{averageRating.toFixed(1)}/5</div>
-                  <p className="text-xs text-muted-foreground">Nota média geral</p>
-                </CardContent>
-              </Card>
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Tempo Médio</p>
+                  <p className="text-3xl font-bold text-gray-900">{tempoMedio}</p>
+                  <p className="text-xs text-gray-500">Minutos</p>
+                </div>
+                <Clock className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Tempo Total</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatDuration(totalDuration)}</div>
-                  <p className="text-xs text-muted-foreground">Tempo degustando</p>
-                </CardContent>
-              </Card>
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avaliação Média</p>
+                  <p className="text-3xl font-bold text-gray-900">{avaliacaoMedia}</p>
+                  <p className="text-xs text-gray-500">De 10</p>
+                </div>
+                <Star className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Duração Média</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {sessions.length > 0 ? formatDuration(Math.round(totalDuration / sessions.length)) : "0 min"}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Por sessão</p>
-                </CardContent>
-              </Card>
-            </div>
+          <Card className="bg-white border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Melhor Avaliação</p>
+                  <p className="text-3xl font-bold text-gray-900">{melhorAvaliacao}</p>
+                  <p className="text-xs text-gray-500">Pontos</p>
+                </div>
+                <Flame className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar por charuto, marca ou observações..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        {/* Filters */}
+        <Card className="bg-white border-0 shadow-sm mb-8">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">Filtros</CardTitle>
+            <CardDescription className="text-gray-600">Encontre degustações específicas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Buscar por nome, marca, origem ou notas..."
+                    value={filtroTexto}
+                    onChange={(e) => setFiltroTexto(e.target.value)}
+                    className="pl-10"
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
               </div>
 
-              <Select value={ratingFilter} onValueChange={setRatingFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filtrar por nota" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as notas</SelectItem>
-                  <SelectItem value="5">5 estrelas</SelectItem>
-                  <SelectItem value="4+">4+ estrelas</SelectItem>
-                  <SelectItem value="3+">3+ estrelas</SelectItem>
-                  <SelectItem value="low">Menos de 3</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date-desc">Mais recente</SelectItem>
-                  <SelectItem value="date-asc">Mais antigo</SelectItem>
-                  <SelectItem value="rating-desc">Maior nota</SelectItem>
-                  <SelectItem value="rating-asc">Menor nota</SelectItem>
-                  <SelectItem value="duration-desc">Maior duração</SelectItem>
-                  <SelectItem value="duration-asc">Menor duração</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Avaliação</label>
+                <Select value={filtroAvaliacao} onValueChange={setFiltroAvaliacao}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    <SelectItem value="9-10">9-10 (Excelente)</SelectItem>
+                    <SelectItem value="7-8">7-8 (Muito Bom)</SelectItem>
+                    <SelectItem value="5-6">5-6 (Bom)</SelectItem>
+                    <SelectItem value="3-4">3-4 (Regular)</SelectItem>
+                    <SelectItem value="1-2">1-2 (Ruim)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Common Flavors */}
-            {commonFlavors.length > 0 && (
-              <Card className="mb-8">
-                <CardHeader>
-                  <CardTitle className="text-lg">Sabores Mais Identificados</CardTitle>
-                  <CardDescription>Os sabores que você mais identifica em suas degustações</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {commonFlavors.map(({ flavor, count }) => (
-                      <Badge key={flavor} variant="secondary" className="text-sm">
-                        {flavor} ({count}x)
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Sessions List */}
-            <div className="space-y-4">
-              {filteredSessions.length > 0 ? (
-                filteredSessions.map((session) => (
-                  <Card key={session.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">{session.cigarName}</h3>
-                              <p className="text-sm text-gray-600">{session.cigarBrand}</p>
-                            </div>
-                            <div className="flex items-center ml-4">
-                              <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                              <span className="font-medium">{session.rating}/5</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-1" />
-                              {new Date(session.startTime).toLocaleDateString("pt-BR")}
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-1" />
-                              {session.duration ? formatDuration(session.duration) : "N/A"}
-                            </div>
-                            {session.environment && (
-                              <div className="flex items-center">
-                                <span className="mr-1">📍</span>
-                                {session.environment}
-                              </div>
-                            )}
-                            {session.pairing && (
-                              <div className="flex items-center">
-                                <span className="mr-1">🥃</span>
-                                {session.pairing}
-                              </div>
-                            )}
-                          </div>
-
-                          {session.flavors && session.flavors.length > 0 && (
-                            <div className="mb-3">
-                              <div className="flex flex-wrap gap-1">
-                                {session.flavors.slice(0, 4).map((flavor) => (
-                                  <Badge key={flavor} variant="outline" className="text-xs">
-                                    {flavor}
-                                  </Badge>
-                                ))}
-                                {session.flavors.length > 4 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{session.flavors.length - 4}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {session.notes && <p className="text-sm text-gray-700 line-clamp-2 mb-3">{session.notes}</p>}
+        {/* History List */}
+        <Card className="bg-white border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              Suas Degustações ({historicoFiltrado.length})
+            </CardTitle>
+            <CardDescription className="text-gray-600">Histórico completo de experiências</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {historicoFiltrado.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Clock className="w-12 h-12 text-gray-400" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">
+                  {historico.length === 0 ? "Nenhuma degustação no histórico ainda" : "Nenhuma degustação encontrada"}
+                </h4>
+                <p className="text-gray-500">
+                  {historico.length === 0
+                    ? "Suas degustações finalizadas aparecerão aqui"
+                    : "Tente ajustar os filtros de busca"}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {historicoFiltrado.map((item) => (
+                  <Card key={item.id} className="border-2 border-gray-200 hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg font-semibold text-gray-900">{item.nome}</CardTitle>
+                          <CardDescription className="text-gray-600">{item.marca}</CardDescription>
                         </div>
-
-                        <div className="flex sm:flex-col gap-2 mt-4 sm:mt-0 sm:ml-4">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setSelectedSession(session)}>
-                                Ver Detalhes
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>{session.cigarName}</DialogTitle>
-                                <DialogDescription>{session.cigarBrand}</DialogDescription>
-                              </DialogHeader>
-
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Data</h4>
-                                    <p className="text-sm">{new Date(session.startTime).toLocaleString("pt-BR")}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Duração</h4>
-                                    <p className="text-sm">
-                                      {session.duration ? formatDuration(session.duration) : "N/A"}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Avaliação Geral</h4>
-                                    <div className="flex items-center">
-                                      <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                                      <span>{session.rating}/5</span>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Queima</h4>
-                                    <p className="text-sm">{session.burnQuality}/5</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Tiragem</h4>
-                                    <p className="text-sm">{session.drawQuality}/5</p>
-                                  </div>
-                                </div>
-
-                                {session.environment && (
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Ambiente</h4>
-                                    <p className="text-sm">{session.environment}</p>
-                                  </div>
-                                )}
-
-                                {session.pairing && (
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-1">Harmonização</h4>
-                                    <p className="text-sm">{session.pairing}</p>
-                                  </div>
-                                )}
-
-                                {session.flavors && session.flavors.length > 0 && (
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Sabores Identificados</h4>
-                                    <div className="flex flex-wrap gap-1">
-                                      {session.flavors.map((flavor) => (
-                                        <Badge key={flavor} variant="secondary" className="text-xs">
-                                          {flavor}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {session.notes && (
-                                  <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Observações</h4>
-                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{session.notes}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
+                        <Badge className="bg-green-100 text-green-800 border-green-200">⭐ {item.avaliacao}/10</Badge>
                       </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2 mb-4">
+                        <p className="text-sm text-gray-600">
+                          <strong>Data:</strong> {new Date(item.dataFim).toLocaleDateString("pt-BR")}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Tempo:</strong> {item.duracaoFumo} min
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Compraria novamente:</strong>{" "}
+                          {item.comprariaNovamente === "sim"
+                            ? "Sim"
+                            : item.comprariaNovamente === "nao"
+                              ? "Não"
+                              : "Depende"}
+                        </p>
+                      </div>
+                      <Button variant="outline" className="w-full bg-transparent" onClick={() => openModal(item)}>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver Detalhes
+                      </Button>
                     </CardContent>
                   </Card>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <Wine className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {searchTerm || ratingFilter !== "all"
-                      ? "Nenhuma degustação encontrada"
-                      : "Nenhuma degustação realizada"}
-                  </h3>
-                  <p className="text-gray-600">
-                    {searchTerm || ratingFilter !== "all"
-                      ? "Tente ajustar os filtros de busca."
-                      : "Inicie sua primeira degustação para começar a construir seu histórico."}
-                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Modal de Detalhes */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">{selectedCharuto?.nome}</DialogTitle>
+              <DialogDescription className="text-gray-600">
+                {selectedCharuto?.marca} - {selectedCharuto?.paisOrigem}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedCharuto && (
+              <div className="space-y-6">
+                {/* Informações Básicas */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Avaliação</p>
+                    <div className="flex items-center">
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        ⭐ {selectedCharuto.avaliacao}/10
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Duração</p>
+                    <p className="text-lg font-semibold">{selectedCharuto.duracaoFumo} minutos</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Data da Degustação</p>
+                    <p className="text-lg font-semibold">
+                      {new Date(selectedCharuto.dataFim).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Compraria Novamente</p>
+                    <p className="text-lg font-semibold">
+                      {selectedCharuto.comprariaNovamente === "sim"
+                        ? "Sim"
+                        : selectedCharuto.comprariaNovamente === "nao"
+                          ? "Não"
+                          : "Depende do Preço"}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </main>
+
+                {/* Detalhes da Degustação */}
+                {(selectedCharuto.corte || selectedCharuto.momento || selectedCharuto.fluxo) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Detalhes da Degustação</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {selectedCharuto.corte && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Tipo de Corte</p>
+                          <p className="text-base capitalize">{selectedCharuto.corte}</p>
+                        </div>
+                      )}
+                      {selectedCharuto.momento && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Momento</p>
+                          <p className="text-base capitalize">{selectedCharuto.momento}</p>
+                        </div>
+                      )}
+                      {selectedCharuto.fluxo && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Fluxo</p>
+                          <p className="text-base capitalize">{selectedCharuto.fluxo}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sabores */}
+                {selectedCharuto.sabores && selectedCharuto.sabores.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Sabores Identificados</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCharuto.sabores.map((sabor, index) => (
+                        <Badge key={index} variant="secondary" className="text-sm">
+                          {sabor}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {selectedCharuto.observacoes && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Observações</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-gray-700">{selectedCharuto.observacoes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Foto da Anilha */}
+                {selectedCharuto.fotoAnilha && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Foto da Anilha</h3>
+                    <img
+                      src={selectedCharuto.fotoAnilha || "/placeholder.svg"}
+                      alt="Anilha do charuto"
+                      className="max-w-full h-auto rounded-lg border"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
-    </ProtectedRoute>
+    </div>
   )
 }
